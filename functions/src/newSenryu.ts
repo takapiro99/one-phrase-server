@@ -1,10 +1,13 @@
 import * as express from 'express'
 import * as Busboy from 'busboy'
 import * as fs from 'fs'
+import { upload } from './lib/storage'
+
 const os = require('os')
 const path = require('path')
 
 export const newSenryu = (req: any, res: express.Response) => {
+  // const bucket = admin.storage().bucket('gs://one-phrase.appspot.com')
   const busboy = new Busboy({ headers: req.headers })
   const tmpdir = os.tmpdir()
   // This object will accumulate all the fields, keyed by their name
@@ -24,46 +27,47 @@ export const newSenryu = (req: any, res: express.Response) => {
     // console.log(`Processed file ${filename}`)
     uploads[fieldname] = file
 
-		const filepath = path.join(tmpdir, filename)
+    const filepath = path.join(tmpdir, filename)
     uploads[fieldname] = filepath
 
-    const writeStream = fs.createWriteStream(filepath);
-    file.pipe(writeStream);
+    const writeStream = fs.createWriteStream(filepath)
+    file.pipe(writeStream)
 
-		// 全部書き終わるのを待つ
-		const promise = new Promise((resolve, reject) => {
+    // 全部書き終わるのを待つ
+    const promise = new Promise((resolve, reject) => {
       file.on('end', () => {
-        writeStream.end();
-      });
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
-    });
-    fileWrites.push(promise);
+        writeStream.end()
+      })
+      writeStream.on('finish', resolve)
+      writeStream.on('error', reject)
+    })
+    fileWrites.push(promise)
   })
 
   // Triggered once all uploaded files are processed by Busboy.
   busboy.on('finish', async () => {
     await Promise.all(fileWrites)
-		if(!(fields.height && fields.userID && fields.lat && fields.lng)){
-			res.status(422).json({message: "height, userID, lat, lng is required."})
-			busboy.end(req.rawBody)
-			return
-		}
-		if(!(uploads.image1 && uploads.image2 && uploads.image3)){
-			res.status(422).json({message: "image1, image2, image3 is required."})
-			busboy.end(req.rawBody)
-			return
-		}
-		// process file here
-    // fs.readFile(uploads.image1, 'utf-8', (err, data) => {
-    //   // if (err) throw err
-		// 	const buffer = Buffer.from(data, "binary");
-    //   console.log(buffer)
-    // })
+    if (!(fields.height && fields.userID && fields.lat && fields.lng)) {
+      res.status(422).json({ message: 'height, userID, lat, lng is required.' })
+      busboy.end(req.rawBody)
+      return
+    }
+    if (!(uploads.image1 && uploads.image2 && uploads.image3)) {
+      res.status(422).json({ message: 'image1, image2, image3 is required.' })
+      busboy.end(req.rawBody)
+      return
+    }
+    upload(uploads[2])
+      .then(() => console.log('done'))
+      .catch((e) => console.error(e))
+    // process file here
+
     for (const file in uploads) {
       fs.unlinkSync(uploads[file])
     }
-    res.json({ message: 'properly received all data! but not saved in firestore yet' })
+    res.json({
+      message: 'properly received all data! but not saved in firestore yet'
+    })
   })
 
   busboy.end(req.rawBody)
