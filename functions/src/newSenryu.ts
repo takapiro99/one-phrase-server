@@ -3,14 +3,34 @@ import Busboy from 'busboy'
 import * as fs from 'fs'
 import joinImages from 'join-images'
 import * as sharp from 'sharp'
-import { upload } from './lib/storage'
+import { upload } from './util/storage'
 import { v4 as uuidv4 } from 'uuid'
+import { db } from './firebase'
+import { DocumentReference, GeoPoint, Timestamp } from '@google-cloud/firestore'
 
 const os = require('os')
 const path = require('path')
 
 interface uploadImages {
   [key: string]: string
+}
+
+// image1	上の句の画像	file
+// image2	中の句の画像	file
+// image3	下の句の画像	file
+// lat	緯度	float
+// lng	緯度	float
+// height	高度(m)	float
+// userId	0vnYn8ti8NIFNyWYNc0m	string
+
+
+interface SenryusScheme {
+  imageURL: string
+  height: number
+  location: GeoPoint
+  // location: FirebaseFirestore.GeoPoint
+  user: DocumentReference
+  createdAt: Timestamp
 }
 
 export const newSenryu = (req: any, res: express.Response) => {
@@ -21,9 +41,9 @@ export const newSenryu = (req: any, res: express.Response) => {
   const fields: any = {}
   // This object will accumulate all the uploaded files, keyed by their name.
   const uploads: uploadImages = {}
+
   // This code will process each non-file field in the form.
   busboy.on('field', (fieldname, val) => {
-    // console.log(`Processed field ${fieldname}: ${val}.`)
     fields[fieldname] = val
   })
 
@@ -51,8 +71,18 @@ export const newSenryu = (req: any, res: express.Response) => {
   // Triggered once all uploaded files are processed by Busboy.
   busboy.on('finish', async () => {
     await Promise.all(fileWrites)
-    if (!(fields.height && fields.userID && fields.lat && fields.lng)) {
-      res.status(422).json({ message: 'height, userID, lat, lng is required.' })
+    if (!(fields.height && fields.userId && fields.lat && fields.lng)) {
+      res.status(422).json({ message: 'height, userId, lat, lng is required.' })
+      return
+    }
+    const lat = Number(fields.lat)
+    const lng = Number(fields.lng)
+    if (Number(fields.height)===NaN || lat===NaN || lng===NaN) {
+      res.status(422).json({ message: 'height, lat, lng must be a number.' })
+      return
+    }
+    if ( lat >= 90 || lat <= -90 || lng >= 180 || lng <= -180) {
+      res.status(422).json({ message: 'lat, lng must be a valid number.' })
       return
     }
     if (!(uploads.image1 && uploads.image2 && uploads.image3)) {
@@ -60,29 +90,30 @@ export const newSenryu = (req: any, res: express.Response) => {
       return
     }
     // concatenate here
-    const newSenryuPath = path.join(tmpdir, `${uuidv4()}.png`)
+    const newSenryuFileName = uuidv4()
     let newImage: sharp.Sharp
+    let newImageBuffer: Buffer
     try {
       newImage = await joinImages(Object.values(uploads).reverse(), {
         direction: 'horizontal'
       })
-      await newImage
-        .png({ compressionLevel: 8, adaptiveFiltering: true, force: true })
-        .toFile(newSenryuPath)
+      newImageBuffer = await newImage.jpeg().toBuffer()
     } catch (error) {
       // failed to join images
       res.status(500).json({
         message: 'failed to merge image. please refer to the logs',
         error: JSON.stringify(error)
       })
-      // console.error(error)
       return
     }
 
     let imageURL: string | undefined
     try {
-      imageURL = await upload(newSenryuPath)
+      imageURL = await upload(newImageBuffer, newSenryuFileName)
       console.log(imageURL)
+      if (!imageURL) {
+        throw Error('no image URL was generated')
+      }
     } catch (error) {
       // failed to upload to cloud firestore
       res.status(500).json({
@@ -90,20 +121,53 @@ export const newSenryu = (req: any, res: express.Response) => {
           'failed to upload merged image to cloud storage. please refer to the logs',
         error: JSON.stringify(error)
       })
-      // console.error(error)
       return
-    } finally {
-      fs.unlinkSync(newSenryuPath)
     }
 
+    // /tmpに置いたファイルたちをお掃除
     for (const file in uploads) {
       fs.unlinkSync(uploads[file])
     }
 
     // imageURLをゲットしたのでfirestoreに保存していきたい
-    res.status(201).json({
-      message: 'properly received all data! but not saved in firestore yet'
-    })
+    let newSenryuData: SenryusScheme
+    const userRef = db.collection('users').doc(fields.userId)
+    const doc = await userRef.get();
+    if (!doc.exists) {
+      res.status(500).json({
+        message:
+          `there was no user: ${fields.userId}. we're working on this problem.`
+      })
+      return
+    }
+    try {
+      newSenryuData = {
+        imageURL: imageURL,
+        height: fields.height as number,
+        location: new GeoPoint(lat, lng),
+        user: db.collection('users').doc(fields.userId),
+        createdAt: Timestamp.now()
+      }
+    } catch (error) {
+      res.status(500).json({
+        message: 'failed to create senryu data.',
+        error: JSON.stringify(error)
+      })
+      return
+    }
+    try {
+      await db.collection('senryus').add(newSenryuData)
+      console.log('成功！')
+      res.status(201).json({
+        message: 'new senryu has uploaded!'
+      })
+    } catch (error) {
+      res.status(500).json({
+        message: 'failed to set data to firestore. please refer to the logs',
+        imageURL: imageURL,
+        error: JSON.stringify(error)
+      })
+    }
   })
 
   busboy.end(req.rawBody)
