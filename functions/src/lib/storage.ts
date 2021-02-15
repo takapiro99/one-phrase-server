@@ -17,6 +17,7 @@ export const upload = async (
         }
       }
     })
+    console.info(JSON.stringify(uploadRes))
     const dlPath = encodeURIComponent(uploadRes[0].name)
     return `${STORAGE_ROOT}/${bucket.name}/o/${dlPath}?alt=media&token=${uuid}`
   } catch (error) {

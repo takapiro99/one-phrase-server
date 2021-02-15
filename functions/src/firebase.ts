@@ -11,6 +11,7 @@ interface Cert {
 if (!process.env.FIREBASE_PROJECT_ID) {
   // Cloud Functionsで実行している場合
   firebaseApp = admin.initializeApp()
+  console.info(`initialized firebase!`)
 } else {
   const cert: Cert = {
     projectId: process.env.FIREBASE_PROJECT_ID,
@@ -25,9 +26,8 @@ if (!process.env.FIREBASE_PROJECT_ID) {
     credential: admin.credential.cert(cert)
   }
   firebaseApp = admin.initializeApp(appOptions)
+  console.info(`initialized firebase as emulator!`)
 }
-
-console.info(`initialized firebase!`)
 
 export const bucket = firebaseApp
   .storage()
