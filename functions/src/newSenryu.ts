@@ -21,9 +21,9 @@ export const newSenryu = (req: any, res: express.Response) => {
   const fields: any = {}
   // This object will accumulate all the uploaded files, keyed by their name.
   const uploads: uploadImages = {}
+
   // This code will process each non-file field in the form.
   busboy.on('field', (fieldname, val) => {
-    // console.log(`Processed field ${fieldname}: ${val}.`)
     fields[fieldname] = val
   })
 
@@ -61,7 +61,6 @@ export const newSenryu = (req: any, res: express.Response) => {
     }
     // concatenate here
     const newSenryuFileName = uuidv4()
-    // const newSenryuPath = path.join(tmpdir, `${uuidv4()}.jpg`)
     let newImage: sharp.Sharp
     let newImageBuffer: Buffer
     try {
@@ -69,8 +68,6 @@ export const newSenryu = (req: any, res: express.Response) => {
         direction: 'horizontal'
       })
       newImageBuffer = await newImage.jpeg().toBuffer()
-      // await newImage.jpeg().toFile(newSenryuPath)
-      console.log("wrote to file!")
     } catch (error) {
       // failed to join images
       res.status(500).json({
@@ -84,8 +81,8 @@ export const newSenryu = (req: any, res: express.Response) => {
     try {
       imageURL = await upload(newImageBuffer, newSenryuFileName)
       console.log(imageURL)
-      if(!imageURL){
-        throw Error("no image URL was generated")
+      if (!imageURL) {
+        throw Error('no image URL was generated')
       }
     } catch (error) {
       // failed to upload to cloud firestore
@@ -103,7 +100,8 @@ export const newSenryu = (req: any, res: express.Response) => {
 
     // imageURLをゲットしたのでfirestoreに保存していきたい
     res.status(201).json({
-      message: 'properly received all data! but not saved in firestore yet'
+      message: 'properly received all data! but not saved in firestore yet',
+      imageURL: imageURL
     })
   })
 
