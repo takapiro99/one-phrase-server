@@ -3,17 +3,24 @@ import { UploadResponse } from '@google-cloud/storage'
 import { bucket } from '../firebase'
 const STORAGE_ROOT = 'https://firebasestorage.googleapis.com/v0/b'
 
-export const upload = async (localFilePath: string): Promise<string> => {
+export const upload = async (
+  localFilePath: string
+): Promise<string | undefined> => {
   const uuid = uuidv4()
-  const uploadRes: UploadResponse = await bucket.upload(localFilePath, {
-    metadata: {
+  let uploadRes: UploadResponse
+  try {
+    uploadRes = await bucket.upload(localFilePath, {
       metadata: {
-        // uuidv4をトークンに指定すると画像が外部で表示できる
-        firebaseStorageDownloadTokens: uuid
+        metadata: {
+          // uuidv4をトークンに指定すると画像が外部で表示できる
+          firebaseStorageDownloadTokens: uuid
+        }
       }
-    }
-  })
-  const dlPath = encodeURIComponent(uploadRes[0].name)
-
-  return `${STORAGE_ROOT}/${bucket.name}/o/${dlPath}?alt=media&token=${uuid}`
+    })
+    const dlPath = encodeURIComponent(uploadRes[0].name)
+    return `${STORAGE_ROOT}/${bucket.name}/o/${dlPath}?alt=media&token=${uuid}`
+  } catch (error) {
+    console.error(JSON.stringify(error))
+    return undefined
+  }
 }

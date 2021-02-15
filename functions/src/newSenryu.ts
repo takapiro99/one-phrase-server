@@ -53,12 +53,10 @@ export const newSenryu = (req: any, res: express.Response) => {
     await Promise.all(fileWrites)
     if (!(fields.height && fields.userID && fields.lat && fields.lng)) {
       res.status(422).json({ message: 'height, userID, lat, lng is required.' })
-      busboy.end(req.rawBody)
       return
     }
     if (!(uploads.image1 && uploads.image2 && uploads.image3)) {
       res.status(422).json({ message: 'image1, image2, image3 is required.' })
-      busboy.end(req.rawBody)
       return
     }
     // concatenate here
@@ -73,28 +71,26 @@ export const newSenryu = (req: any, res: express.Response) => {
         .toFile(newSenryuPath)
     } catch (error) {
       // failed to join images
-      res
-        .status(500)
-        .json({ message: 'failed to merge image. please refer to the logs' })
-      busboy.end(req.rawBody)
-      console.error(error)
+      res.status(500).json({
+        message: 'failed to merge image. please refer to the logs',
+        error: JSON.stringify(error)
+      })
+      // console.error(error)
       return
     }
 
-    let imageURL: string
+    let imageURL: string | undefined
     try {
       imageURL = await upload(newSenryuPath)
       console.log(imageURL)
     } catch (error) {
       // failed to upload to cloud firestore
-      res
-        .status(500)
-        .json({
-          message:
-            'failed to upload merged image to cloud storage. please refer to the logs'
-        })
-      busboy.end(req.rawBody)
-      console.error(error)
+      res.status(500).json({
+        message:
+          'failed to upload merged image to cloud storage. please refer to the logs',
+        error: JSON.stringify(error)
+      })
+      // console.error(error)
       return
     } finally {
       fs.unlinkSync(newSenryuPath)
@@ -105,7 +101,7 @@ export const newSenryu = (req: any, res: express.Response) => {
     }
 
     // imageURLをゲットしたのでfirestoreに保存していきたい
-    res.json({
+    res.status(201).json({
       message: 'properly received all data! but not saved in firestore yet'
     })
   })
