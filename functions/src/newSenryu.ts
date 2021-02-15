@@ -3,8 +3,10 @@ import Busboy from 'busboy'
 import * as fs from 'fs'
 import joinImages from 'join-images'
 import * as sharp from 'sharp'
-import { upload } from './lib/storage'
+import { upload } from './util/storage'
 import { v4 as uuidv4 } from 'uuid'
+import { db } from './firebase'
+import { DocumentReference, GeoPoint, Timestamp } from '@google-cloud/firestore'
 
 const os = require('os')
 const path = require('path')
@@ -13,8 +15,6 @@ interface uploadImages {
   [key: string]: string
 }
 
-<<<<<<< Updated upstream
-=======
 // interface reqFields {
 //   userId?: string
 //   height?: string
@@ -30,7 +30,6 @@ interface SenryusScheme {
   createdAt: Timestamp
 }
 
->>>>>>> Stashed changes
 export const newSenryu = (req: any, res: express.Response) => {
   const busboy = new Busboy({ headers: req.headers })
   const tmpdir = os.tmpdir()
@@ -38,13 +37,9 @@ export const newSenryu = (req: any, res: express.Response) => {
   const fields: any = {}
   // This object will accumulate all the uploaded files, keyed by their name.
   const uploads: uploadImages = {}
+
   // This code will process each non-file field in the form.
-<<<<<<< Updated upstream
-  busboy.on('field', (fieldname, val) => {
-    // console.log(`Processed field ${fieldname}: ${val}.`)
-=======
   busboy.on('field', (fieldname: any, val) => {
->>>>>>> Stashed changes
     fields[fieldname] = val
   })
 
@@ -68,10 +63,6 @@ export const newSenryu = (req: any, res: express.Response) => {
   // Triggered once all uploaded files are processed by Busboy.
   busboy.on('finish', async () => {
     await Promise.all(fileWrites)
-<<<<<<< Updated upstream
-    if (!(fields.height && fields.userID && fields.lat && fields.lng)) {
-      res.status(422).json({ message: 'height, userID, lat, lng is required.' })
-=======
     if (!(fields.height && fields.userId && fields.lat && fields.lng)) {
       res.status(422).json({ message: 'height, userId, lat, lng is required.' })
       return
@@ -84,7 +75,7 @@ export const newSenryu = (req: any, res: express.Response) => {
     }
     if (lat >= 90 || lat <= -90 || lng >= 180 || lng <= -180) {
       res.status(422).json({ message: 'lat, lng must be a valid number.' })
->>>>>>> Stashed changes
+
       return
     }
     if (!(uploads.image1 && uploads.image2 && uploads.image3)) {
@@ -92,36 +83,29 @@ export const newSenryu = (req: any, res: express.Response) => {
       return
     }
     // concatenate here
-    const newSenryuPath = path.join(tmpdir, `${uuidv4()}.png`)
+    const newSenryuFileName = uuidv4()
     let newImage: sharp.Sharp
+    let newImageBuffer: Buffer
     try {
       newImage = await joinImages(Object.values(uploads).reverse(), {
         direction: 'horizontal'
       })
-      await newImage
-        .png({ compressionLevel: 8, adaptiveFiltering: true, force: true })
-        .toFile(newSenryuPath)
+      newImageBuffer = await newImage.jpeg().toBuffer()
     } catch (error) {
       // failed to join images
       res.status(500).json({
         message: 'failed to merge image. please refer to the logs',
         error: JSON.stringify(error)
       })
-      // console.error(error)
       return
     }
 
     let imageURL: string | undefined
     try {
-<<<<<<< Updated upstream
-      imageURL = await upload(newSenryuPath)
-      console.log(imageURL)
-=======
       imageURL = await upload(newImageBuffer, newSenryuFileName)
       if (!imageURL) {
         throw Error('no image URL was generated')
       }
->>>>>>> Stashed changes
     } catch (error) {
       // failed to upload to cloud firestore
       res.status(500).json({
@@ -129,22 +113,14 @@ export const newSenryu = (req: any, res: express.Response) => {
           'failed to upload merged image to cloud storage. please refer to the logs',
         error: JSON.stringify(error)
       })
-      // console.error(error)
       return
-    } finally {
-      fs.unlinkSync(newSenryuPath)
     }
 
+    // /tmpに置いたファイルたちをお掃除
     for (const file in uploads) {
       fs.unlinkSync(uploads[file])
     }
 
-    // imageURLをゲットしたのでfirestoreに保存していきたい
-<<<<<<< Updated upstream
-    res.status(201).json({
-      message: 'properly received all data! but not saved in firestore yet'
-    })
-=======
     let newSenryuData: SenryusScheme
     const userRef = db.collection('users').doc(fields.userId)
     const doc = await userRef.get()
@@ -182,8 +158,6 @@ export const newSenryu = (req: any, res: express.Response) => {
         error: JSON.stringify(error)
       })
     }
->>>>>>> Stashed changes
   })
-
   busboy.end(req.rawBody)
 }
