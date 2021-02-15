@@ -64,21 +64,25 @@ export const newSenryu = (req: any, res: express.Response) => {
   busboy.on('finish', async () => {
     await Promise.all(fileWrites)
     if (!(fields.height && fields.userId && fields.lat && fields.lng)) {
+      console.info("422, height, userId, lat, lng is required. ")
       res.status(422).json({ message: 'height, userId, lat, lng is required.' })
       return
     }
     const lat = Number(fields.lat)
     const lng = Number(fields.lng)
     if (Number(fields.height) === NaN || lat === NaN || lng === NaN) {
+      console.info("422 height, lat, lng must be a number.")
       res.status(422).json({ message: 'height, lat, lng must be a number.' })
       return
     }
     if (lat >= 90 || lat <= -90 || lng >= 180 || lng <= -180) {
+      console.info("422 lat, lng must be a valid number.")
       res.status(422).json({ message: 'lat, lng must be a valid number.' })
 
       return
     }
     if (!(uploads.image1 && uploads.image2 && uploads.image3)) {
+      console.info("422, image1, image2, image3 is required.")
       res.status(422).json({ message: 'image1, image2, image3 is required.' })
       return
     }
@@ -93,6 +97,7 @@ export const newSenryu = (req: any, res: express.Response) => {
       newImageBuffer = await newImage.jpeg().toBuffer()
     } catch (error) {
       // failed to join images
+      console.info("500 failed to merge image: " + JSON.stringify(error))
       res.status(500).json({
         message: 'failed to merge image. please refer to the logs',
         error: JSON.stringify(error)
@@ -108,6 +113,7 @@ export const newSenryu = (req: any, res: express.Response) => {
       }
     } catch (error) {
       // failed to upload to cloud firestore
+      console.info("500 failed to upload to cloud storage: " + JSON.stringify(error))
       res.status(500).json({
         message:
           'failed to upload merged image to cloud storage. please refer to the logs',
@@ -125,6 +131,7 @@ export const newSenryu = (req: any, res: express.Response) => {
     const userRef = db.collection('users').doc(fields.userId)
     const doc = await userRef.get()
     if (!doc.exists) {
+      console.info("500 no user: " + fields.userId)
       res.status(500).json({
         message: `there was no user: ${fields.userId}. we're working on this problem.`
       })
@@ -139,6 +146,7 @@ export const newSenryu = (req: any, res: express.Response) => {
         createdAt: Timestamp.now()
       }
     } catch (error) {
+      console.info("500 failed to create senryu data: " + JSON.stringify(error))
       res.status(500).json({
         message: 'failed to create senryu data.',
         error: JSON.stringify(error)
@@ -153,6 +161,7 @@ export const newSenryu = (req: any, res: express.Response) => {
         imageURL: imageURL
       })
     } catch (error) {
+      console.info("500 failed to set to firestore: " + JSON.stringify(error))
       res.status(500).json({
         message: 'failed to set data to firestore. please refer to the logs',
         imageURL: imageURL,

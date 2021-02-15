@@ -17,11 +17,12 @@ router.get('/', (req, res: express.Response) => {
 
 router.post('/new', newSenryu)
 
-router.get("/get-all-senryus", getSenryus)
+router.get('/get-all-senryus', getSenryus)
 
-router.use((req, res: express.Response) =>
+router.use((req, res: express.Response) => {
+  console.info('not found')
   res.status(404).json({ message: 'no content' })
-)
+})
 
 app.use('/', router)
 
