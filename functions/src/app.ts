@@ -1,5 +1,5 @@
 // tslint:disable-next-line:no-import-side-effect
-import * as express from 'express'
+import express from 'express'
 import { newSenryu } from './newSenryu'
 
 const cors = require('cors')

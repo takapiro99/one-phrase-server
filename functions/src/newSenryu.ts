@@ -1,10 +1,16 @@
 import * as express from 'express'
-import * as Busboy from 'busboy'
+import Busboy from 'busboy'
 import * as fs from 'fs'
+import joinImages from 'join-images'
+import * as sharp from 'sharp'
+import { upload } from './lib/storage'
+import { v4 as uuidv4 } from 'uuid'
+
 const os = require('os')
 const path = require('path')
 
 export const newSenryu = (req: any, res: express.Response) => {
+  // const bucket = admin.storage().bucket('gs://one-phrase.appspot.com')
   const busboy = new Busboy({ headers: req.headers })
   const tmpdir = os.tmpdir()
   // This object will accumulate all the fields, keyed by their name
@@ -24,46 +30,79 @@ export const newSenryu = (req: any, res: express.Response) => {
     // console.log(`Processed file ${filename}`)
     uploads[fieldname] = file
 
-		const filepath = path.join(tmpdir, filename)
+    const filepath = path.join(tmpdir, filename)
     uploads[fieldname] = filepath
-
-    const writeStream = fs.createWriteStream(filepath);
-    file.pipe(writeStream);
-
-		// 全部書き終わるのを待つ
-		const promise = new Promise((resolve, reject) => {
+    const writeStream = fs.createWriteStream(filepath)
+    file.pipe(writeStream)
+    // 全部書き終わるのを待つ
+    const promise = new Promise((resolve, reject) => {
       file.on('end', () => {
-        writeStream.end();
-      });
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
-    });
-    fileWrites.push(promise);
+        writeStream.end()
+      })
+      writeStream.on('finish', resolve)
+      writeStream.on('error', reject)
+    })
+    fileWrites.push(promise)
   })
 
   // Triggered once all uploaded files are processed by Busboy.
   busboy.on('finish', async () => {
     await Promise.all(fileWrites)
-		if(!(fields.height && fields.userID && fields.lat && fields.lng)){
-			res.status(422).json({message: "height, userID, lat, lng is required."})
-			busboy.end(req.rawBody)
-			return
-		}
-		if(!(uploads.image1 && uploads.image2 && uploads.image3)){
-			res.status(422).json({message: "image1, image2, image3 is required."})
-			busboy.end(req.rawBody)
-			return
-		}
-		// process file here
-    // fs.readFile(uploads.image1, 'utf-8', (err, data) => {
-    //   // if (err) throw err
-		// 	const buffer = Buffer.from(data, "binary");
-    //   console.log(buffer)
-    // })
+    if (!(fields.height && fields.userID && fields.lat && fields.lng)) {
+      res.status(422).json({ message: 'height, userID, lat, lng is required.' })
+      busboy.end(req.rawBody)
+      return
+    }
+    if (!(uploads.image1 && uploads.image2 && uploads.image3)) {
+      res.status(422).json({ message: 'image1, image2, image3 is required.' })
+      busboy.end(req.rawBody)
+      return
+    }
+    // concatenate here
+    const newSenryuPath = path.join(tmpdir, `${uuidv4()}.png`)
+    let newImage: sharp.Sharp
+    try {
+      newImage = await joinImages(
+        (Object.values(uploads) as Array<string>).reverse(),
+        { direction: 'horizontal' }
+      )
+      await newImage
+        .png({ compressionLevel: 8, adaptiveFiltering: true, force: true })
+        .toFile(newSenryuPath)
+    } catch (error) {
+      // failed to join images
+      res
+        .status(500)
+        .json({ message: 'failed to merge image. please refer to the logs' })
+      busboy.end(req.rawBody)
+      console.error(error)
+      return
+    }
+
+    let imageURL: string
+    try {
+      imageURL = await upload(newSenryuPath)
+      console.log(imageURL)
+    } catch (error) {
+      // failed to upload to cloud firestore
+      res
+        .status(500)
+        .json({ message: 'failed to upload merged image to cloud storage. please refer to the logs' })
+      busboy.end(req.rawBody)
+      console.error(error)
+      return
+    } finally {
+      fs.unlinkSync(newSenryuPath)
+    }
+
     for (const file in uploads) {
       fs.unlinkSync(uploads[file])
     }
-    res.json({ message: 'properly received all data! but not saved in firestore yet' })
+
+    // imageURLをゲットしたのでfirestoreに保存していきたい
+    res.json({
+      message: 'properly received all data! but not saved in firestore yet'
+    })
   })
 
   busboy.end(req.rawBody)

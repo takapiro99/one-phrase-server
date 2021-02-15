@@ -3,7 +3,7 @@
   "scripts": {
     "lint": "eslint \"src/**/*\"",
     "build": "tsc",
-    "serve": "npm run build && firebase emulators:start --only functions",
+    "serve": "npm run build && env-cmd firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
@@ -15,18 +15,24 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@google-cloud/storage": "^5.7.4",
     "busboy": "^0.3.1",
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "firebase-admin": "^9.2.0",
     "firebase-functions": "^3.11.0",
-    "sharp": "^0.27.1"
+    "join-images": "^0.2.5",
+    "sharp": "^0.27.1",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.11",
     "@types/express-busboy": "^6.0.2",
+    "@types/sharp": "^0.27.1",
+    "@types/uuid": "^8.3.0",
     "@typescript-eslint/eslint-plugin": "^3.9.1",
     "@typescript-eslint/parser": "^3.8.0",
+    "env-cmd": "^10.1.0",
     "eslint": "^7.6.0",
     "eslint-plugin-import": "^2.22.0",
     "firebase-functions-test": "^0.2.0",
