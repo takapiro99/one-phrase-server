@@ -1,5 +1,6 @@
 // tslint:disable-next-line:no-import-side-effect
 import express from 'express'
+import { getSenryus } from './getSenryus'
 import { newSenryu } from './newSenryu'
 
 const cors = require('cors')
@@ -15,6 +16,8 @@ router.get('/', (req, res: express.Response) => {
 })
 
 router.post('/new', newSenryu)
+
+router.get("/get-all-senryus", getSenryus)
 
 router.use((req, res: express.Response) =>
   res.status(404).json({ message: 'no content' })
