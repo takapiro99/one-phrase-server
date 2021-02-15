@@ -3,7 +3,7 @@ import Busboy from 'busboy'
 import * as fs from 'fs'
 import joinImages from 'join-images'
 import * as sharp from 'sharp'
-import { upload } from './lib/storage'
+import { upload } from './util/storage'
 import { v4 as uuidv4 } from 'uuid'
 
 const os = require('os')
@@ -60,29 +60,33 @@ export const newSenryu = (req: any, res: express.Response) => {
       return
     }
     // concatenate here
-    const newSenryuPath = path.join(tmpdir, `${uuidv4()}.png`)
+    const newSenryuFileName = uuidv4()
+    // const newSenryuPath = path.join(tmpdir, `${uuidv4()}.jpg`)
     let newImage: sharp.Sharp
+    let newImageBuffer: Buffer
     try {
       newImage = await joinImages(Object.values(uploads).reverse(), {
         direction: 'horizontal'
       })
-      await newImage
-        .png({ compressionLevel: 8, adaptiveFiltering: true, force: true })
-        .toFile(newSenryuPath)
+      newImageBuffer = await newImage.jpeg().toBuffer()
+      // await newImage.jpeg().toFile(newSenryuPath)
+      console.log("wrote to file!")
     } catch (error) {
       // failed to join images
       res.status(500).json({
         message: 'failed to merge image. please refer to the logs',
         error: JSON.stringify(error)
       })
-      // console.error(error)
       return
     }
 
     let imageURL: string | undefined
     try {
-      imageURL = await upload(newSenryuPath)
+      imageURL = await upload(newImageBuffer, newSenryuFileName)
       console.log(imageURL)
+      if(!imageURL){
+        throw Error("no image URL was generated")
+      }
     } catch (error) {
       // failed to upload to cloud firestore
       res.status(500).json({
@@ -90,10 +94,7 @@ export const newSenryu = (req: any, res: express.Response) => {
           'failed to upload merged image to cloud storage. please refer to the logs',
         error: JSON.stringify(error)
       })
-      // console.error(error)
       return
-    } finally {
-      fs.unlinkSync(newSenryuPath)
     }
 
     for (const file in uploads) {
