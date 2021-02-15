@@ -1,7 +1,10 @@
 import * as express from 'express'
-import * as Busboy from 'busboy'
+import Busboy from 'busboy'
 import * as fs from 'fs'
+import joinImages from 'join-images'
+import * as sharp from 'sharp'
 import { upload } from './lib/storage'
+import { v4 as uuidv4 } from 'uuid'
 
 const os = require('os')
 const path = require('path')
@@ -29,10 +32,8 @@ export const newSenryu = (req: any, res: express.Response) => {
 
     const filepath = path.join(tmpdir, filename)
     uploads[fieldname] = filepath
-
     const writeStream = fs.createWriteStream(filepath)
     file.pipe(writeStream)
-
     // 全部書き終わるのを待つ
     const promise = new Promise((resolve, reject) => {
       file.on('end', () => {
@@ -57,14 +58,48 @@ export const newSenryu = (req: any, res: express.Response) => {
       busboy.end(req.rawBody)
       return
     }
-    upload(uploads[2])
-      .then(() => console.log('done'))
-      .catch((e) => console.error(e))
-    // process file here
+    // concatenate here
+    const newSenryuPath = path.join(tmpdir, `${uuidv4()}.png`)
+    let newImage: sharp.Sharp
+    try {
+      newImage = await joinImages(
+        (Object.values(uploads) as Array<string>).reverse(),
+        { direction: 'horizontal' }
+      )
+      await newImage
+        .png({ compressionLevel: 8, adaptiveFiltering: true, force: true })
+        .toFile(newSenryuPath)
+    } catch (error) {
+      // failed to join images
+      res
+        .status(500)
+        .json({ message: 'failed to merge image. please refer to the logs' })
+      busboy.end(req.rawBody)
+      console.error(error)
+      return
+    }
+
+    let imageURL: string
+    try {
+      imageURL = await upload(newSenryuPath)
+      console.log(imageURL)
+    } catch (error) {
+      // failed to upload to cloud firestore
+      res
+        .status(500)
+        .json({ message: 'failed to upload merged image to cloud storage. please refer to the logs' })
+      busboy.end(req.rawBody)
+      console.error(error)
+      return
+    } finally {
+      fs.unlinkSync(newSenryuPath)
+    }
 
     for (const file in uploads) {
       fs.unlinkSync(uploads[file])
     }
+
+    // imageURLをゲットしたのでfirestoreに保存していきたい
     res.json({
       message: 'properly received all data! but not saved in firestore yet'
     })
