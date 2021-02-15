@@ -9,6 +9,10 @@ import { v4 as uuidv4 } from 'uuid'
 const os = require('os')
 const path = require('path')
 
+interface uploadImages {
+  [key: string]: string
+}
+
 export const newSenryu = (req: any, res: express.Response) => {
   // const bucket = admin.storage().bucket('gs://one-phrase.appspot.com')
   const busboy = new Busboy({ headers: req.headers })
@@ -16,7 +20,7 @@ export const newSenryu = (req: any, res: express.Response) => {
   // This object will accumulate all the fields, keyed by their name
   const fields: any = {}
   // This object will accumulate all the uploaded files, keyed by their name.
-  const uploads: any = {}
+  const uploads: uploadImages = {}
   // This code will process each non-file field in the form.
   busboy.on('field', (fieldname, val) => {
     // console.log(`Processed field ${fieldname}: ${val}.`)
@@ -27,8 +31,7 @@ export const newSenryu = (req: any, res: express.Response) => {
 
   // This code will process each file uploaded.
   busboy.on('file', (fieldname, file, filename) => {
-    // console.log(`Processed file ${filename}`)
-    uploads[fieldname] = file
+    // uploads[fieldname] = file
 
     const filepath = path.join(tmpdir, filename)
     uploads[fieldname] = filepath
@@ -62,10 +65,9 @@ export const newSenryu = (req: any, res: express.Response) => {
     const newSenryuPath = path.join(tmpdir, `${uuidv4()}.png`)
     let newImage: sharp.Sharp
     try {
-      newImage = await joinImages(
-        (Object.values(uploads) as Array<string>).reverse(),
-        { direction: 'horizontal' }
-      )
+      newImage = await joinImages(Object.values(uploads).reverse(), {
+        direction: 'horizontal'
+      })
       await newImage
         .png({ compressionLevel: 8, adaptiveFiltering: true, force: true })
         .toFile(newSenryuPath)
@@ -87,7 +89,10 @@ export const newSenryu = (req: any, res: express.Response) => {
       // failed to upload to cloud firestore
       res
         .status(500)
-        .json({ message: 'failed to upload merged image to cloud storage. please refer to the logs' })
+        .json({
+          message:
+            'failed to upload merged image to cloud storage. please refer to the logs'
+        })
       busboy.end(req.rawBody)
       console.error(error)
       return

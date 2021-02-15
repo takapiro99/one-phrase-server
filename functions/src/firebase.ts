@@ -18,18 +18,19 @@ if (!process.env.FIREBASE_PROJECT_ID) {
     privateKey: (process.env.FIREBASE_PRIVATE_KEY as string).replace(
       /\\n/g,
       '\n'
-    ),
+    )
   }
 
   const appOptions: admin.AppOptions = {
-    credential: admin.credential.cert(cert),
+    credential: admin.credential.cert(cert)
   }
   firebaseApp = admin.initializeApp(appOptions)
 }
 
 console.info(`initialized firebase!`)
 
-export const bucket = firebaseApp.storage().bucket(`gs://${process.env.FIREBASE_PROJECT_ID}.appspot.com`);
+export const bucket = firebaseApp
+  .storage()
+  .bucket(`gs://${process.env.FIREBASE_PROJECT_ID}.appspot.com`)
 
 export default firebaseApp
-
