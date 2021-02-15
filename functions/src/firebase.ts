@@ -35,7 +35,7 @@ if (!process.env.FIREBASE_PROJECT_ID) {
     .bucket(`${process.env.FIREBASE_PROJECT_ID}.appspot.com`)
   console.info(`initialized firebase as emulator!`)
 }
-
+export const db = firebaseApp.firestore()
 export { bucket }
 
 export default firebaseApp
