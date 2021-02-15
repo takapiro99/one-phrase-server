@@ -147,9 +147,10 @@ export const newSenryu = (req: any, res: express.Response) => {
     }
     try {
       const ref = await db.collection('senryus').add(newSenryuData)
-      console.log(`uploaded new senryu! : ${ref.id}`)
+      console.log(`uploaded new senryu! : ${ref.id}`, imageURL)
       res.status(201).json({
-        message: 'new senryu has uploaded!'
+        message: 'new senryu has uploaded!',
+        imageURL: imageURL
       })
     } catch (error) {
       res.status(500).json({
